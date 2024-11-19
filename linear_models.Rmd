@@ -225,7 +225,38 @@ nyc_airbnb |>
          room_type == "Shared room")
 ```
 
+## Binary outcome
+```{r}
+baltimore_df <-  
+  read_csv("data/homicide-data.csv") |> 
+  filter(city == "Baltimore") |> 
+  mutate(
+    resolved = as.numeric(disposition == "Closed by arrest"),
+    victim_age = as.numeric(victim_age),
+    victim_race = fct_relevel(victim_race, "White")) |> 
+  select(resolved, victim_age, victim_race, victim_sex)
+```
 
+```{r}
+fit_logistic = 
+  baltimore_df |> 
+  glm(resolved ~ victim_age + victim_race + victim_sex, data = _, family = binomial()) 
+```
+
+```{r}
+fit_logistic |> 
+  broom::tidy() |> 
+  mutate(OR = exp(estimate)) |>
+  select(term, log_OR = estimate, OR, p.value) |> 
+  knitr::kable(digits = 3)
+```
+
+We can also compute fitted values; similarly to the estimates in the model summary, these are expressed as log odds and can be transformed to produce probabilities for each subject.
+```{r}
+baltimore_df |> 
+  modelr::add_predictions(fit_logistic) |> 
+  mutate(fitted_prob = boot::inv.logit(pred))
+```
 
 
 

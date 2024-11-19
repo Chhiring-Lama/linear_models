@@ -401,3 +401,74 @@ nyc_airbnb |>
     ##   price stars borough   neighborhood room_type  
     ##   <dbl> <dbl> <fct>     <chr>        <fct>      
     ## 1   219     4 Manhattan NoHo         Shared room
+
+## Binary outcome
+
+``` r
+baltimore_df <-  
+  read_csv("data/homicide-data.csv") |> 
+  filter(city == "Baltimore") |> 
+  mutate(
+    resolved = as.numeric(disposition == "Closed by arrest"),
+    victim_age = as.numeric(victim_age),
+    victim_race = fct_relevel(victim_race, "White")) |> 
+  select(resolved, victim_age, victim_race, victim_sex)
+```
+
+    ## Rows: 52179 Columns: 12
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## chr (9): uid, victim_last, victim_first, victim_race, victim_age, victim_sex...
+    ## dbl (3): reported_date, lat, lon
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
+fit_logistic = 
+  baltimore_df |> 
+  glm(resolved ~ victim_age + victim_race + victim_sex, data = _, family = binomial()) 
+```
+
+``` r
+fit_logistic |> 
+  broom::tidy() |> 
+  mutate(OR = exp(estimate)) |>
+  select(term, log_OR = estimate, OR, p.value) |> 
+  knitr::kable(digits = 3)
+```
+
+| term                | log_OR |    OR | p.value |
+|:--------------------|-------:|------:|--------:|
+| (Intercept)         |  1.190 | 3.287 |   0.000 |
+| victim_age          | -0.007 | 0.993 |   0.027 |
+| victim_raceAsian    |  0.296 | 1.345 |   0.653 |
+| victim_raceBlack    | -0.842 | 0.431 |   0.000 |
+| victim_raceHispanic | -0.265 | 0.767 |   0.402 |
+| victim_raceOther    | -0.768 | 0.464 |   0.385 |
+| victim_sexMale      | -0.880 | 0.415 |   0.000 |
+
+We can also compute fitted values; similarly to the estimates in the
+model summary, these are expressed as log odds and can be transformed to
+produce probabilities for each subject.
+
+``` r
+baltimore_df |> 
+  modelr::add_predictions(fit_logistic) |> 
+  mutate(fitted_prob = boot::inv.logit(pred))
+```
+
+    ## # A tibble: 2,827 × 6
+    ##    resolved victim_age victim_race victim_sex    pred fitted_prob
+    ##       <dbl>      <dbl> <fct>       <chr>        <dbl>       <dbl>
+    ##  1        0         17 Black       Male       -0.654        0.342
+    ##  2        0         26 Black       Male       -0.720        0.327
+    ##  3        0         21 Black       Male       -0.683        0.335
+    ##  4        1         61 White       Male       -0.131        0.467
+    ##  5        1         46 Black       Male       -0.864        0.296
+    ##  6        1         27 Black       Male       -0.727        0.326
+    ##  7        1         21 Black       Male       -0.683        0.335
+    ##  8        1         16 Black       Male       -0.647        0.344
+    ##  9        1         21 Black       Male       -0.683        0.335
+    ## 10        1         44 Black       Female      0.0297       0.507
+    ## # ℹ 2,817 more rows
