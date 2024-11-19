@@ -14,7 +14,9 @@ nyc_airbnb <-
   rename(borough = neighbourhood_group,
     neighborhood = neighbourhood) |> 
   filter(borough != "Staten Island") |> 
-  select(price, stars, borough, neighborhood, room_type)
+  select(price, stars, borough, neighborhood, room_type) |> 
+  mutate(borough = fct_infreq(borough), 
+         room_type = fct_infreq(room_type))
 ```
 
 Fit linear regression to predict price using stars and borough
@@ -36,12 +38,12 @@ summary(fit)
     ## -169.8  -64.0  -29.0   20.2 9870.0 
     ## 
     ## Coefficients:
-    ##                  Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)       -70.414     14.021  -5.022 5.14e-07 ***
-    ## stars              31.990      2.527  12.657  < 2e-16 ***
-    ## boroughBrooklyn    40.500      8.559   4.732 2.23e-06 ***
-    ## boroughManhattan   90.254      8.567  10.534  < 2e-16 ***
-    ## boroughQueens      13.206      9.065   1.457    0.145    
+    ##                 Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)       19.839     12.189   1.628    0.104    
+    ## stars             31.990      2.527  12.657   <2e-16 ***
+    ## boroughBrooklyn  -49.754      2.235 -22.262   <2e-16 ***
+    ## boroughQueens    -77.048      3.727 -20.675   <2e-16 ***
+    ## boroughBronx     -90.254      8.567 -10.534   <2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
@@ -62,10 +64,8 @@ names(summary(fit))
 coef(fit)
 ```
 
-    ##      (Intercept)            stars  boroughBrooklyn boroughManhattan 
-    ##        -70.41446         31.98989         40.50030         90.25393 
-    ##    boroughQueens 
-    ##         13.20617
+    ##     (Intercept)           stars boroughBrooklyn   boroughQueens    boroughBronx 
+    ##        19.83946        31.98989       -49.75363       -77.04776       -90.25393
 
 ``` r
 fit |> 
@@ -74,13 +74,13 @@ fit |>
 ```
 
     ## # A tibble: 5 × 3
-    ##   term             estimate  p.value
-    ##   <chr>               <dbl>    <dbl>
-    ## 1 (Intercept)         -70.4 5.14e- 7
-    ## 2 stars                32.0 1.27e-36
-    ## 3 boroughBrooklyn      40.5 2.23e- 6
-    ## 4 boroughManhattan     90.3 6.64e-26
-    ## 5 boroughQueens        13.2 1.45e- 1
+    ##   term            estimate   p.value
+    ##   <chr>              <dbl>     <dbl>
+    ## 1 (Intercept)         19.8 1.04e-  1
+    ## 2 stars               32.0 1.27e- 36
+    ## 3 boroughBrooklyn    -49.8 6.32e-109
+    ## 4 boroughQueens      -77.0 2.58e- 94
+    ## 5 boroughBronx       -90.3 6.64e- 26
 
 ``` r
 fit |> 
@@ -105,10 +105,68 @@ fit |>
   knitr::kable(digits = 3)
 ```
 
-| term              | estimate | p.value |
-|:------------------|---------:|--------:|
-| (Intercept)       |  -70.414 |   0.000 |
-| stars             |   31.990 |   0.000 |
-| Borough:Brooklyn  |   40.500 |   0.000 |
-| Borough:Manhattan |   90.254 |   0.000 |
-| Borough:Queens    |   13.206 |   0.145 |
+| term             | estimate | p.value |
+|:-----------------|---------:|--------:|
+| (Intercept)      |   19.839 |   0.104 |
+| stars            |   31.990 |   0.000 |
+| Borough:Brooklyn |  -49.754 |   0.000 |
+| Borough:Queens   |  -77.048 |   0.000 |
+| Borough:Bronx    |  -90.254 |   0.000 |
+
+## Some diagnostics
+
+(backtrack to some EDA)
+
+``` r
+nyc_airbnb |> 
+  ggplot(aes(y = price, x = stars)) +
+  geom_point() +
+  stat_smooth(method = "lm")
+```
+
+    ## `geom_smooth()` using formula = 'y ~ x'
+
+<img src="linear_models_files/figure-gfm/unnamed-chunk-4-1.png" width="85%" style="display: block; margin: auto;" />
+
+Most diagnostics use residuals
+
+``` r
+modelr::add_residuals(nyc_airbnb, fit) |> 
+  ggplot(aes(x = resid)) +
+  geom_histogram()
+```
+
+    ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+
+<img src="linear_models_files/figure-gfm/unnamed-chunk-5-1.png" width="85%" style="display: block; margin: auto;" />
+
+``` r
+modelr::add_residuals(nyc_airbnb, fit) |> 
+  ggplot(aes(x = borough, y = resid)) +
+  geom_violin() +
+  ylim(-200, 500)
+```
+
+<img src="linear_models_files/figure-gfm/unnamed-chunk-6-1.png" width="85%" style="display: block; margin: auto;" />
+
+Residuals against stars
+
+``` r
+modelr::add_residuals(nyc_airbnb, fit) |> 
+  ggplot(aes(x = stars, y = resid)) +
+  geom_point()
+```
+
+<img src="linear_models_files/figure-gfm/unnamed-chunk-7-1.png" width="85%" style="display: block; margin: auto;" />
+
+Residuals against fitted values
+
+``` r
+nyc_airbnb |> 
+  modelr::add_residuals(fit) |> 
+  modelr::add_predictions(fit) |> 
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point()
+```
+
+<img src="linear_models_files/figure-gfm/unnamed-chunk-8-1.png" width="85%" style="display: block; margin: auto;" />
