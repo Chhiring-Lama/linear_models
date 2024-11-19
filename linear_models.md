@@ -170,3 +170,234 @@ nyc_airbnb |>
 ```
 
 <img src="linear_models_files/figure-gfm/unnamed-chunk-8-1.png" width="85%" style="display: block; margin: auto;" />
+
+## Hypothesis Testing
+
+For single coefficient, at the table
+
+``` r
+fit |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 5 × 5
+    ##   term            estimate std.error statistic   p.value
+    ##   <chr>              <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 (Intercept)         19.8     12.2       1.63 1.04e-  1
+    ## 2 stars               32.0      2.53     12.7  1.27e- 36
+    ## 3 boroughBrooklyn    -49.8      2.23    -22.3  6.32e-109
+    ## 4 boroughQueens      -77.0      3.73    -20.7  2.58e- 94
+    ## 5 boroughBronx       -90.3      8.57    -10.5  6.64e- 26
+
+When adding more than one coeff, use anova(),
+
+``` r
+fit_null <- lm(price ~ stars + borough, data = nyc_airbnb)
+fit_alt <- lm(price ~ stars + borough + room_type, data = nyc_airbnb)
+```
+
+Look at both
+
+``` r
+fit_null |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 5 × 5
+    ##   term            estimate std.error statistic   p.value
+    ##   <chr>              <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 (Intercept)         19.8     12.2       1.63 1.04e-  1
+    ## 2 stars               32.0      2.53     12.7  1.27e- 36
+    ## 3 boroughBrooklyn    -49.8      2.23    -22.3  6.32e-109
+    ## 4 boroughQueens      -77.0      3.73    -20.7  2.58e- 94
+    ## 5 boroughBronx       -90.3      8.57    -10.5  6.64e- 26
+
+``` r
+fit_alt |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 7 × 5
+    ##   term                  estimate std.error statistic  p.value
+    ##   <chr>                    <dbl>     <dbl>     <dbl>    <dbl>
+    ## 1 (Intercept)              113.      11.8       9.54 1.56e-21
+    ## 2 stars                     21.9      2.43      9.01 2.09e-19
+    ## 3 boroughBrooklyn          -40.3      2.15    -18.8  4.62e-78
+    ## 4 boroughQueens            -55.5      3.59    -15.4  1.32e-53
+    ## 5 boroughBronx             -63.0      8.22     -7.67 1.76e-14
+    ## 6 room_typePrivate room   -105.       2.05    -51.2  0       
+    ## 7 room_typeShared room    -129.       6.15    -21.0  2.24e-97
+
+``` r
+anova(fit_null, fit_alt) |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 2 × 7
+    ##   term                        df.residual    rss    df   sumsq statistic p.value
+    ##   <chr>                             <dbl>  <dbl> <dbl>   <dbl>     <dbl>   <dbl>
+    ## 1 price ~ stars + borough           30525 1.01e9    NA NA            NA       NA
+    ## 2 price ~ stars + borough + …       30523 9.21e8     2  8.42e7     1394.       0
+
+## Do effects differ across boroughs
+
+First, use a lot of interactions
+
+``` r
+nyc_airbnb |> 
+  lm(price ~ stars + borough + room_type*borough, data = _) |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 13 × 5
+    ##    term                                  estimate std.error statistic  p.value
+    ##    <chr>                                    <dbl>     <dbl>     <dbl>    <dbl>
+    ##  1 (Intercept)                              121.      11.8      10.3  1.01e-24
+    ##  2 stars                                     21.8      2.42      8.97 3.06e-19
+    ##  3 boroughBrooklyn                          -55.5      2.94    -18.9  2.81e-79
+    ##  4 boroughQueens                            -86.7      5.66    -15.3  1.09e-52
+    ##  5 boroughBronx                            -108.      14.9      -7.27 3.78e-13
+    ##  6 room_typePrivate room                   -125.       2.99    -41.7  0       
+    ##  7 room_typeShared room                    -154.       8.69    -17.7  9.81e-70
+    ##  8 boroughBrooklyn:room_typePrivate room     32.4      4.31      7.51 5.97e-14
+    ##  9 boroughQueens:room_typePrivate room       56.0      7.44      7.52 5.60e-14
+    ## 10 boroughBronx:room_typePrivate room        71.6     18.0       3.98 7.03e- 5
+    ## 11 boroughBrooklyn:room_typeShared room      48.1     13.9       3.46 5.34e- 4
+    ## 12 boroughQueens:room_typeShared room        60.7     17.9       3.40 6.72e- 4
+    ## 13 boroughBronx:room_typeShared room         85.4     42.4       2.01 4.41e- 2
+
+Strong interaction between borough and room type. But, we dont the
+situation in manhattan and roomtypes.
+
+Could fit separate models.
+
+``` r
+nyc_airbnb |> 
+  filter(borough == "Manhattan") |> 
+  lm(price ~ stars + room_type, data = _) |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 4 × 5
+    ##   term                  estimate std.error statistic   p.value
+    ##   <chr>                    <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 (Intercept)               95.7     22.2       4.31 1.62e-  5
+    ## 2 stars                     27.1      4.59      5.91 3.45e-  9
+    ## 3 room_typePrivate room   -124.       3.46    -35.8  9.40e-270
+    ## 4 room_typeShared room    -154.      10.1     -15.3  2.47e- 52
+
+Within, Manhattan, strong association with roomtypes for price.
+
+``` r
+nyc_airbnb |> 
+  filter(borough == "Brooklyn") |> 
+  lm(price ~ stars + room_type, data = _) |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 4 × 5
+    ##   term                  estimate std.error statistic   p.value
+    ##   <chr>                    <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 (Intercept)               69.6     14.0       4.96 7.27e-  7
+    ## 2 stars                     21.0      2.98      7.05 1.90e- 12
+    ## 3 room_typePrivate room    -92.2      2.72    -34.0  6.40e-242
+    ## 4 room_typeShared room    -106.       9.43    -11.2  4.15e- 29
+
+Similar observation here in Brooklyn too. Can check for the Bronx and
+Queens too.
+
+Get fancy and use list columns
+
+``` r
+nyc_airbnb |> 
+  nest(data = -borough) |> 
+  mutate(
+    model = map(data, \(x) lm(price ~ stars + room_type, data = x)), 
+    results = map(model, broom::tidy)
+  ) |> 
+  select(borough, results) |> 
+  unnest(results) |> 
+  select(borough, term, estimate) |> 
+  pivot_wider(
+    names_from = term, 
+    values_from = estimate
+  )
+```
+
+    ## # A tibble: 4 × 5
+    ##   borough   `(Intercept)` stars `room_typePrivate room` `room_typeShared room`
+    ##   <fct>             <dbl> <dbl>                   <dbl>                  <dbl>
+    ## 1 Bronx              90.1  4.45                   -52.9                  -70.5
+    ## 2 Queens             91.6  9.65                   -69.3                  -95.0
+    ## 3 Brooklyn           69.6 21.0                    -92.2                 -106. 
+    ## 4 Manhattan          95.7 27.1                   -124.                  -154.
+
+What about room type across manhattan neighborhoods?
+
+``` r
+nyc_airbnb |> 
+  filter(borough == "Manhattan", 
+         neighborhood == "Chinatown") |> 
+  lm(price ~ stars + room_type, data = _) |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 4 × 5
+    ##   term                  estimate std.error statistic  p.value
+    ##   <chr>                    <dbl>     <dbl>     <dbl>    <dbl>
+    ## 1 (Intercept)              337.       60.4      5.59 5.66e- 8
+    ## 2 stars                    -27.8      13.0     -2.14 3.34e- 2
+    ## 3 room_typePrivate room   -109.       11.5     -9.52 1.03e-18
+    ## 4 room_typeShared room    -143.       93.2     -1.54 1.25e- 1
+
+``` r
+nyc_airbnb |> 
+  filter(borough == "Manhattan", 
+         neighborhood == "Chelsea") |> 
+  lm(price ~ stars + room_type, data = _) |> 
+  broom::tidy()
+```
+
+    ## # A tibble: 4 × 5
+    ##   term                  estimate std.error statistic  p.value
+    ##   <chr>                    <dbl>     <dbl>     <dbl>    <dbl>
+    ## 1 (Intercept)              477.      135.       3.53 4.38e- 4
+    ## 2 stars                    -44.5      27.3     -1.63 1.04e- 1
+    ## 3 room_typePrivate room   -133.       12.7    -10.5  2.13e-24
+    ## 4 room_typeShared room    -153.       36.2     -4.24 2.49e- 5
+
+Lets do this for all neighborhoods!
+
+``` r
+manhattan_neighborhood_fit_df <- nyc_airbnb |> 
+  filter(borough == "Manhattan") |> 
+  nest(data = -(borough:neighborhood)) |> 
+  mutate(
+    model = map(data, \(x) lm(price ~ stars + room_type, data = x)), 
+    results = map(model, broom::tidy)
+  ) |> 
+  select(borough, neighborhood, results) |> 
+  unnest(results) 
+```
+
+Look at the effect of the room type
+
+``` r
+manhattan_neighborhood_fit_df |> 
+  filter(str_detect(term, "room_type")) |> 
+  ggplot(aes(x = term, y = estimate)) +
+  geom_boxplot()
+```
+
+<img src="linear_models_files/figure-gfm/unnamed-chunk-18-1.png" width="85%" style="display: block; margin: auto;" />
+
+``` r
+nyc_airbnb |> 
+  filter(neighborhood == "NoHo", 
+         room_type == "Shared room")
+```
+
+    ## # A tibble: 1 × 5
+    ##   price stars borough   neighborhood room_type  
+    ##   <dbl> <dbl> <fct>     <chr>        <fct>      
+    ## 1   219     4 Manhattan NoHo         Shared room
