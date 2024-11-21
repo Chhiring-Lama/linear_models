@@ -170,4 +170,52 @@ cv_res_df |>
 
 <img src="cross_validation_files/figure-gfm/unnamed-chunk-12-1.png" width="85%" style="display: block; margin: auto;" />
 
-Smooth model has the least RMSE. So, this seems to be the best fit
+Smooth model has the least RMSE. So, this seems to be the best fit.
+
+## Example: Child Growth
+
+Import Nepalese children dataset
+
+``` r
+child_df <- read_csv("data/nepalese_children.csv") |> 
+  mutate(
+    weight_ch7 = (weight > 7) * (weight - 7)
+  )
+```
+
+    ## Rows: 2705 Columns: 5
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (5): age, sex, weight, height, armc
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+Look at the data
+
+``` r
+ggplot(child_df, aes(x = weight, y = armc)) +
+  geom_point(alpha = 0.5)
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-14-1.png" width="85%" style="display: block; margin: auto;" />
+
+Fit some models
+
+``` r
+linear_model = lm(armc ~ weight, data = child_df)
+pwl_model = lm(armc ~ weight + height, data = child_df)
+smooth_model = gam(armc ~ s(weight), data = child_df)
+```
+
+``` r
+child_df |> 
+  gather_predictions(linear_model, pwl_model, smooth_model) |> 
+  mutate(model = fct_inorder(model)) |> 
+  ggplot(aes(x = weight, y = armc)) + 
+  geom_point(alpha = .5) +
+  geom_line(aes(y = pred), color = "red") + 
+  facet_grid(~model)
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-16-1.png" width="85%" style="display: block; margin: auto;" />
