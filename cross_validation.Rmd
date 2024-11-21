@@ -113,4 +113,42 @@ rmse(wiggly_model, test_df)
 Small difference between smooth and wiggly model. Will this be consistent if we use different training and testing data
 
 ## Repeat the train/test split
+```{r}
+cv_df <- crossv_mc(lidar_df, 100)
+
+cv_df |>  
+  pull(train) |>
+  nth(3) |> 
+  as_tibble()
+```
+
+```{r}
+cv_res_df <- cv_df |> 
+  mutate(
+    linear_mod = map(train, \(x) lm(logratio ~ range, data = x)), 
+    smooth_mod = map(train, \(x) gam(logratio ~ s(range), data = x)), 
+    wiggly_mod = map(train, \(x) gam(logratio ~ s(range, k = 30), sp = 10e-6, data = x))
+  ) |> 
+  mutate(
+    rmse_linear = map2_dbl(linear_mod, test, rmse), 
+    rmse_smooth = map2_dbl(smooth_mod, test, rmse), 
+    rmse_wiggly = map2_dbl(wiggly_mod, test, rmse)
+  )
+```
+
+```{r}
+cv_res_df |> 
+  select(starts_with("rmse"))  |> 
+  pivot_longer(
+    everything(),
+    names_to = "model_type", 
+    values_to = "rmse"
+  ) |> 
+  ggplot(aes(x = model_type, y = rmse)) +
+  geom_violin()
+  
+```
+
+Smooth model has the least RMSE. So, this seems to be the best fit
+
 
