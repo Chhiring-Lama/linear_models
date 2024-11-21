@@ -1,0 +1,70 @@
+---
+title: "Cross Validation"
+author: "Chhiring Lama"
+date: "2024-11-19"
+output: github_document
+---
+
+```{r setup, include=FALSE, message = FALSE}
+library(tidyverse)
+library(modelr)
+library(mgcv)
+library(SemiPar)
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "85%", 
+	fig.align = "center"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+
+set.seed(1)
+```
+
+Look at LIDAR data
+```{r}
+data("lidar")
+
+lidar_df <- lidar |> 
+  as_tibble() |> 
+  mutate(id = row_number())
+```
+
+```{r}
+lidar_df |> 
+  ggplot(aes(x = range, y = logratio)) + 
+  geom_point()
+```
+
+## Try to do CV
+
+Compare 3 models = one Linear, one smooth and one wiggly
+
+Construct training and testing datasets
+```{r}
+train_df <- sample_frac(
+  lidar_df, 
+  size = .8
+)
+
+test_df <- anti_join(lidar_df, train_df, by = "id")
+```
+
+Look at these
+```{r}
+train_df |> 
+  ggplot(aes(x = range, y = logratio)) + 
+  geom_point()+
+  geom_point(data = test_df, color = "red")
+```
+
+
+
+
