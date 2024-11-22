@@ -50,16 +50,16 @@ train_df |>
 Fit the 3 models
 
 ``` r
-linear_model = lm(logratio ~ range, data = train_df)
-smooth_model = gam(logratio ~ s(range), data = train_df)
-wiggly_model = gam(logratio ~ s(range, k = 30), data = train_df, sp = 10e-6)
+linear_mod = lm(logratio ~ range, data = train_df)
+smooth_mod = gam(logratio ~ s(range), data = train_df)
+wiggly_mod = gam(logratio ~ s(range, k = 30), data = train_df, sp = 10e-6)
 ```
 
 Look at the fits
 
 ``` r
 train_df |> 
-  add_predictions(linear_model) |> 
+  add_predictions(linear_mod) |> 
   ggplot(aes(x = range, y = logratio)) + 
   geom_point()+
   geom_line(aes(y = pred), color = "red") +
@@ -71,7 +71,7 @@ train_df |>
 
 ``` r
 train_df |> 
-  add_predictions(wiggly_model) |> 
+  add_predictions(wiggly_mod) |> 
   ggplot(aes(x = range, y = logratio)) + 
   geom_point()+
   geom_line(aes(y = pred), color = "red") +
@@ -83,7 +83,7 @@ train_df |>
 
 ``` r
 train_df |> 
-  add_predictions(smooth_model) |> 
+  add_predictions(smooth_mod) |> 
   ggplot(aes(x = range, y = logratio)) + 
   geom_point()+
   geom_line(aes(y = pred), color = "red") +
@@ -96,19 +96,19 @@ train_df |>
 Compare them numerically using RMSE
 
 ``` r
-rmse(linear_model, test_df)
+rmse(linear_mod, test_df)
 ```
 
     ## [1] 0.127317
 
 ``` r
-rmse(smooth_model, test_df)
+rmse(smooth_mod, test_df)
 ```
 
     ## [1] 0.08302008
 
 ``` r
-rmse(wiggly_model, test_df)
+rmse(wiggly_mod, test_df)
 ```
 
     ## [1] 0.08848557
@@ -119,7 +119,10 @@ consistent if we use different training and testing data
 ## Repeat the train/test split
 
 ``` r
-cv_df <- crossv_mc(lidar_df, 100)
+cv_df <- crossv_mc(lidar_df, 100) |> 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
 
 cv_df |>  
   pull(train) |>
@@ -179,7 +182,7 @@ Import Nepalese children dataset
 ``` r
 child_df <- read_csv("data/nepalese_children.csv") |> 
   mutate(
-    weight_ch7 = (weight > 7) * (weight - 7)
+    weight_cp7 = (weight > 7) * (weight - 7)
   )
 ```
 
@@ -203,14 +206,14 @@ ggplot(child_df, aes(x = weight, y = armc)) +
 Fit some models
 
 ``` r
-linear_model = lm(armc ~ weight, data = child_df)
-pwl_model = lm(armc ~ weight + height, data = child_df)
-smooth_model = gam(armc ~ s(weight), data = child_df)
+linear_mod = lm(armc ~ weight, data = child_df)
+pwl_mod = lm(armc ~ weight + weight_cp7, data = child_df)
+smooth_mod = gam(armc ~ s(weight), data = child_df)
 ```
 
 ``` r
 child_df |> 
-  gather_predictions(linear_model, pwl_model, smooth_model) |> 
+  gather_predictions(linear_mod, pwl_mod, smooth_mod) |> 
   mutate(model = fct_inorder(model)) |> 
   ggplot(aes(x = weight, y = armc)) + 
   geom_point(alpha = .5) +
@@ -219,3 +222,49 @@ child_df |>
 ```
 
 <img src="cross_validation_files/figure-gfm/unnamed-chunk-16-1.png" width="85%" style="display: block; margin: auto;" />
+
+CV to select models
+
+``` r
+cv_df <- crossv_mc(child_df, 100) |> 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+  
+
+cv_res_df <- cv_df |> 
+  mutate(
+    linear_mod = map(train, \(x) lm(armc ~ weight, data = x)), 
+    smooth_mod = map(train, \(x) gam(armc ~ s(weight), data = x)), 
+    pwl_mod = map(train, \(x) lm(armc ~ weight + weight_cp7, data = x))
+  ) |> 
+  mutate(
+    rmse_linear = map2_dbl(linear_mod, test, rmse), 
+    rmse_smooth = map2_dbl(smooth_mod, test, rmse), 
+    rmse_pwl = map2_dbl(pwl_mod, test, rmse)
+  )
+```
+
+``` r
+cv_res_df |> 
+  select(starts_with("rmse"))  |> 
+  pivot_longer(
+    everything(),
+    names_to = "model_type", 
+    values_to = "rmse"
+  ) |> 
+  ggplot(aes(x = model_type, y = rmse)) +
+  geom_violin()
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-18-1.png" width="85%" style="display: block; margin: auto;" />
+Notes: Based on these results, there’s clearly some improvement in
+predictive accuracy gained by allowing non-linearity – whether this is
+sufficient to justify a more complex model isn’t obvious, though. Among
+the non-linear models, the smooth fit from gam might be a bit better
+than the piecewise linear model. Which candidate model is best, though,
+depends a bit on the need to balance complexity with goodness of fit and
+interpretability. In the end, I’d probably go with the piecewise linear
+model – the non-linearity is clear enough that it should be accounted
+for, and the differences between the piecewise and gam fits are small
+enough that the easy interpretation of the piecewise model “wins”.
